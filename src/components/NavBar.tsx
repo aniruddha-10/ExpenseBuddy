@@ -16,7 +16,7 @@ const NavBar: React.FC = () => {
   return (
     <header className="bg-background border-b border-border sticky top-0 z-10">
       <div className="container mx-auto flex items-center justify-between h-16 px-4">
-        <Link to="/" className="font-bold text-lg">Budget Tracker</Link>
+        <Link to="/" className="font-bold text-lg">ExpenseBuddy</Link>
 
         {isAuthenticated ? (
           <nav className="flex items-center gap-4">
