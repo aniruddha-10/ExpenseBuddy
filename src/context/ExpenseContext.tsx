@@ -1,5 +1,6 @@
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { useAuth } from './AuthContext';
 
 export type ExpenseCategory = 
   | 'Food' 
@@ -18,6 +19,7 @@ export interface Expense {
   amount: number;
   date: Date;
   category: ExpenseCategory;
+  userId?: string;
 }
 
 export const CATEGORIES: ExpenseCategory[] = [
@@ -52,8 +54,13 @@ const ExpenseContext = createContext<ExpenseContextType | undefined>(undefined);
 const LOCAL_STORAGE_KEY = 'budget-tracker-expenses';
 
 export const ExpenseProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { userId, isAuthenticated } = useAuth();
+  const storageKey = userId ? `${LOCAL_STORAGE_KEY}-${userId}` : LOCAL_STORAGE_KEY;
+  
   const [expenses, setExpenses] = useState<Expense[]>(() => {
-    const storedExpenses = localStorage.getItem(LOCAL_STORAGE_KEY);
+    if (!isAuthenticated) return [];
+    
+    const storedExpenses = localStorage.getItem(storageKey);
     if (storedExpenses) {
       try {
         // Convert string dates back to Date objects
@@ -71,13 +78,16 @@ export const ExpenseProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   // Save expenses to localStorage whenever they change
   useEffect(() => {
-    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(expenses));
-  }, [expenses]);
+    if (isAuthenticated && userId) {
+      localStorage.setItem(storageKey, JSON.stringify(expenses));
+    }
+  }, [expenses, isAuthenticated, userId, storageKey]);
 
   const addExpense = (expense: Omit<Expense, 'id'>) => {
     const newExpense = {
       ...expense,
       id: crypto.randomUUID(),
+      userId: userId || undefined,
     };
     setExpenses((prev) => [...prev, newExpense]);
   };

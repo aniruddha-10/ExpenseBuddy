@@ -39,7 +39,15 @@ const ExpenseForm: React.FC = () => {
   });
 
   const onSubmit = (data: ExpenseFormValues) => {
-    addExpense(data);
+    // Explicitly type the submission data to match Expense minus id
+    const expenseData = {
+      title: data.title,
+      amount: data.amount,
+      date: data.date,
+      category: data.category,
+    };
+    
+    addExpense(expenseData);
     form.reset();
     setIsFormOpen(false);
     toast.success('Expense added successfully!');
