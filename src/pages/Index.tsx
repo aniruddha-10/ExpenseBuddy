@@ -1,16 +1,16 @@
 
 import React from 'react';
 import { Navigate } from 'react-router-dom';
-import { useUser } from '@clerk/clerk-react';
+import { useAuth } from '@/context/AuthContext';
 
 const Index = () => {
-  const { isSignedIn, isLoaded } = useUser();
+  const { isAuthenticated, loading } = useAuth();
   
-  if (!isLoaded) {
+  if (loading) {
     return <div className="flex h-screen w-full items-center justify-center">Loading...</div>;
   }
   
-  return isSignedIn 
+  return isAuthenticated 
     ? <Navigate to="/expenses" replace /> 
     : <Navigate to="/auth/sign-in" replace />;
 };

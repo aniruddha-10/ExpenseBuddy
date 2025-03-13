@@ -1,47 +1,44 @@
 
 import React from 'react';
-import { UserButton } from '@clerk/clerk-react';
-import { Link, useLocation } from 'react-router-dom';
-import { Button } from './ui/button';
-import { ChartPieIcon, ReceiptIcon } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
+import { Button } from '@/components/ui/button';
+import { useAuth } from '@/context/AuthContext';
 
 const NavBar: React.FC = () => {
-  const location = useLocation();
-  
+  const { isAuthenticated, signOut } = useAuth();
+  const navigate = useNavigate();
+
+  const handleSignOut = async () => {
+    await signOut();
+    navigate('/auth/sign-in');
+  };
+
   return (
-    <div className="border-b bg-card sticky top-0 z-10">
-      <div className="container mx-auto py-2 flex items-center justify-between">
-        <div className="text-xl font-bold">Budget Tracker</div>
-        
-        <div className="flex items-center gap-4">
-          <nav className="hidden md:flex items-center gap-2">
-            <Button
-              variant={location.pathname === '/expenses' ? 'default' : 'ghost'}
-              size="sm"
-              asChild
-            >
-              <Link to="/expenses" className="flex items-center gap-2">
-                <ReceiptIcon className="w-4 h-4" />
-                Expenses
-              </Link>
-            </Button>
-            
-            <Button
-              variant={location.pathname === '/analysis' ? 'default' : 'ghost'}
-              size="sm"
-              asChild
-            >
-              <Link to="/analysis" className="flex items-center gap-2">
-                <ChartPieIcon className="w-4 h-4" />
-                Analysis
-              </Link>
+    <header className="bg-background border-b border-border sticky top-0 z-10">
+      <div className="container mx-auto flex items-center justify-between h-16 px-4">
+        <Link to="/" className="font-bold text-lg">Budget Tracker</Link>
+
+        {isAuthenticated ? (
+          <nav className="flex items-center gap-4">
+            <Link to="/expenses" className="text-sm hover:text-primary transition-colors">
+              Expenses
+            </Link>
+            <Link to="/analysis" className="text-sm hover:text-primary transition-colors">
+              Analysis
+            </Link>
+            <Button variant="outline" size="sm" onClick={handleSignOut}>
+              Sign Out
             </Button>
           </nav>
-          
-          <UserButton afterSignOutUrl="/auth/sign-in" />
-        </div>
+        ) : (
+          <nav>
+            <Link to="/auth/sign-in">
+              <Button variant="outline" size="sm">Sign In</Button>
+            </Link>
+          </nav>
+        )}
       </div>
-    </div>
+    </header>
   );
 };
 

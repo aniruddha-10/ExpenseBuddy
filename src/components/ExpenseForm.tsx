@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -27,6 +26,7 @@ type ExpenseFormValues = z.infer<typeof expenseSchema>;
 const ExpenseForm: React.FC = () => {
   const { addExpense } = useExpense();
   const [isFormOpen, setIsFormOpen] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const form = useForm<ExpenseFormValues>({
     resolver: zodResolver(expenseSchema),
@@ -38,19 +38,27 @@ const ExpenseForm: React.FC = () => {
     },
   });
 
-  const onSubmit = (data: ExpenseFormValues) => {
-    // Explicitly type the submission data to match Expense minus id
-    const expenseData = {
-      title: data.title,
-      amount: data.amount,
-      date: data.date,
-      category: data.category,
-    };
+  const onSubmit = async (data: ExpenseFormValues) => {
+    setIsSubmitting(true);
     
-    addExpense(expenseData);
-    form.reset();
-    setIsFormOpen(false);
-    toast.success('Expense added successfully!');
+    try {
+      const expenseData = {
+        title: data.title,
+        amount: data.amount,
+        date: data.date,
+        category: data.category,
+      };
+      
+      await addExpense(expenseData);
+      form.reset();
+      setIsFormOpen(false);
+      toast.success('Expense added successfully!');
+    } catch (error) {
+      console.error('Error submitting expense:', error);
+      toast.error('Failed to add expense. Please try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -178,14 +186,16 @@ const ExpenseForm: React.FC = () => {
                   type="button" 
                   variant="outline" 
                   onClick={() => setIsFormOpen(false)}
+                  disabled={isSubmitting}
                 >
                   Cancel
                 </Button>
                 <Button 
                   type="submit"
                   className="bg-gradient-to-r from-primary to-secondary hover:opacity-90"
+                  disabled={isSubmitting}
                 >
-                  Save Expense
+                  {isSubmitting ? 'Saving...' : 'Save Expense'}
                 </Button>
               </div>
             </form>

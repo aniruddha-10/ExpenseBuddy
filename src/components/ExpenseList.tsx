@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useExpense, ExpenseCategory } from '@/context/ExpenseContext';
 import { format } from 'date-fns';
@@ -8,8 +7,6 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { TrashIcon, ArrowUpDown } from 'lucide-react';
 import { toast } from 'sonner';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Calendar } from '@/components/ui/calendar';
 
 const getCategoryColor = (category: ExpenseCategory) => {
   const colors: Record<ExpenseCategory, string> = {
@@ -28,7 +25,7 @@ const getCategoryColor = (category: ExpenseCategory) => {
 };
 
 const ExpenseList: React.FC = () => {
-  const { expenses, deleteExpense } = useExpense();
+  const { expenses, deleteExpense, loading } = useExpense();
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [selectedMonth, setSelectedMonth] = useState<string>(
     new Date().getMonth().toString()
@@ -36,8 +33,8 @@ const ExpenseList: React.FC = () => {
   const [selectedYear, setSelectedYear] = useState<string>(
     new Date().getFullYear().toString()
   );
+  const [isDeleting, setIsDeleting] = useState<string | null>(null);
   
-  // Generate list of years from 5 years ago to 5 years in the future
   const currentYear = new Date().getFullYear();
   const years = Array.from({ length: 11 }, (_, i) => (currentYear - 5 + i).toString());
   
@@ -56,7 +53,6 @@ const ExpenseList: React.FC = () => {
     { value: '11', label: 'December' }
   ];
 
-  // Filter expenses by selected month and year
   const filteredExpenses = expenses.filter(expense => {
     return (
       expense.date.getMonth() === parseInt(selectedMonth) &&
@@ -64,16 +60,20 @@ const ExpenseList: React.FC = () => {
     );
   });
 
-  // Sort expenses by date
   const sortedExpenses = [...filteredExpenses].sort((a, b) => {
     const dateA = a.date.getTime();
     const dateB = b.date.getTime();
     return sortOrder === 'asc' ? dateA - dateB : dateB - dateA;
   });
 
-  const handleDeleteExpense = (id: string) => {
-    deleteExpense(id);
-    toast.success('Expense deleted successfully!');
+  const handleDeleteExpense = async (id: string) => {
+    setIsDeleting(id);
+    try {
+      await deleteExpense(id);
+      toast.success('Expense deleted successfully!');
+    } finally {
+      setIsDeleting(null);
+    }
   };
 
   const toggleSortOrder = () => {
@@ -129,7 +129,11 @@ const ExpenseList: React.FC = () => {
         </div>
       </div>
 
-      {sortedExpenses.length === 0 ? (
+      {loading ? (
+        <div className="text-center py-12 bg-muted rounded-lg">
+          <p className="text-muted-foreground">Loading expenses...</p>
+        </div>
+      ) : sortedExpenses.length === 0 ? (
         <div className="text-center py-12 bg-muted rounded-lg">
           <p className="text-muted-foreground">No expenses found for this period</p>
         </div>
@@ -157,9 +161,13 @@ const ExpenseList: React.FC = () => {
                     variant="ghost"
                     size="sm"
                     onClick={() => handleDeleteExpense(expense.id)}
+                    disabled={isDeleting === expense.id}
                     className="text-destructive hover:text-destructive hover:bg-destructive/10"
                   >
-                    <TrashIcon className="h-4 w-4" />
+                    {isDeleting === expense.id ? 
+                      'Deleting...' : 
+                      <TrashIcon className="h-4 w-4" />
+                    }
                   </Button>
                 </div>
               </CardContent>

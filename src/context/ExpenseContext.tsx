@@ -1,6 +1,7 @@
-
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { useAuth } from './AuthContext';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 
 export type ExpenseCategory = 
   | 'Food' 
@@ -19,7 +20,7 @@ export interface Expense {
   amount: number;
   date: Date;
   category: ExpenseCategory;
-  userId?: string;
+  user_id?: string;
 }
 
 export const CATEGORIES: ExpenseCategory[] = [
@@ -36,8 +37,8 @@ export const CATEGORIES: ExpenseCategory[] = [
 
 interface ExpenseContextType {
   expenses: Expense[];
-  addExpense: (expense: Omit<Expense, 'id'>) => void;
-  deleteExpense: (id: string) => void;
+  addExpense: (expense: Omit<Expense, 'id' | 'user_id'>) => Promise<void>;
+  deleteExpense: (id: string) => Promise<void>;
   filterByMonth: (month: number, year: number) => Expense[];
   filterByDateRange: (startDate: Date, endDate: Date) => Expense[];
   getTotalExpenses: () => number;
@@ -47,53 +48,97 @@ interface ExpenseContextType {
   getExpensesByCategory: () => Record<ExpenseCategory, number>;
   getDailyTotals: (month: number, year: number) => { date: string; total: number }[];
   getMonthlyTotals: (year: number) => { month: string; total: number }[];
+  loading: boolean;
 }
 
 const ExpenseContext = createContext<ExpenseContextType | undefined>(undefined);
 
-const LOCAL_STORAGE_KEY = 'budget-tracker-expenses';
-
 export const ExpenseProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { userId, isAuthenticated } = useAuth();
-  const storageKey = userId ? `${LOCAL_STORAGE_KEY}-${userId}` : LOCAL_STORAGE_KEY;
+  const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [loading, setLoading] = useState(true);
   
-  const [expenses, setExpenses] = useState<Expense[]>(() => {
-    if (!isAuthenticated) return [];
-    
-    const storedExpenses = localStorage.getItem(storageKey);
-    if (storedExpenses) {
-      try {
-        // Convert string dates back to Date objects
-        return JSON.parse(storedExpenses).map((expense: any) => ({
-          ...expense,
-          date: new Date(expense.date)
-        }));
-      } catch (error) {
-        console.error('Error parsing expenses from localStorage:', error);
-        return [];
-      }
-    }
-    return [];
-  });
-
-  // Save expenses to localStorage whenever they change
   useEffect(() => {
     if (isAuthenticated && userId) {
-      localStorage.setItem(storageKey, JSON.stringify(expenses));
+      fetchExpenses();
+    } else {
+      setExpenses([]);
+      setLoading(false);
     }
-  }, [expenses, isAuthenticated, userId, storageKey]);
+  }, [isAuthenticated, userId]);
 
-  const addExpense = (expense: Omit<Expense, 'id'>) => {
-    const newExpense = {
-      ...expense,
-      id: crypto.randomUUID(),
-      userId: userId || undefined,
-    };
-    setExpenses((prev) => [...prev, newExpense]);
+  const fetchExpenses = async () => {
+    setLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('expenses')
+        .select('*')
+        .order('date', { ascending: false });
+
+      if (error) throw error;
+
+      const formattedExpenses = data.map((expense: any) => ({
+        ...expense,
+        date: new Date(expense.date)
+      }));
+
+      setExpenses(formattedExpenses);
+    } catch (error: any) {
+      console.error('Error fetching expenses:', error.message);
+      toast.error('Failed to load your expenses');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const deleteExpense = (id: string) => {
-    setExpenses((prev) => prev.filter((expense) => expense.id !== id));
+  const addExpense = async (expense: Omit<Expense, 'id' | 'user_id'>) => {
+    if (!isAuthenticated || !userId) {
+      toast.error('You must be logged in to add expenses');
+      return;
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from('expenses')
+        .insert([
+          {
+            ...expense,
+            user_id: userId,
+            date: expense.date.toISOString()
+          }
+        ])
+        .select();
+
+      if (error) throw error;
+
+      const newExpense = {
+        ...data[0],
+        date: new Date(data[0].date)
+      };
+      
+      setExpenses((prev) => [newExpense, ...prev]);
+      return;
+    } catch (error: any) {
+      console.error('Error adding expense:', error.message);
+      toast.error('Failed to add expense');
+      throw error;
+    }
+  };
+
+  const deleteExpense = async (id: string) => {
+    try {
+      const { error } = await supabase
+        .from('expenses')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+
+      setExpenses((prev) => prev.filter((expense) => expense.id !== id));
+    } catch (error: any) {
+      console.error('Error deleting expense:', error.message);
+      toast.error('Failed to delete expense');
+    }
   };
 
   const filterByMonth = (month: number, year: number) => {
@@ -153,7 +198,6 @@ export const ExpenseProvider: React.FC<{ children: React.ReactNode }> = ({ child
       dailyTotals[dateStr] = (dailyTotals[dateStr] || 0) + expense.amount;
     });
 
-    // Convert to array and sort by date
     return Object.entries(dailyTotals)
       .map(([date, total]) => ({ date, total }))
       .sort((a, b) => a.date.localeCompare(b.date));
@@ -196,6 +240,7 @@ export const ExpenseProvider: React.FC<{ children: React.ReactNode }> = ({ child
         getExpensesByCategory,
         getDailyTotals,
         getMonthlyTotals,
+        loading
       }}
     >
       {children}
